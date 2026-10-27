@@ -1,0 +1,42 @@
+import Foundation
+
+/// The .env scaffold the app writes on first use of "Edit .env…".
+enum Templates {
+    static let envExample = """
+    # Meeting Notes configuration.
+    # Everything here stays on this machine. Only the API calls you enable below
+    # leave it; with whisper.cpp plus Ollama the app never touches the network.
+
+    # --- Where notes and audio are saved -------------------------------------
+    # NOTES_DIR=~/MeetingNotes
+
+    # --- Transcription --------------------------------------------------------
+    # auto (default) = local whisper.cpp when it is installed, otherwise an API key below.
+    # TRANSCRIBE_BACKEND=auto      # auto | local | openai | groq
+
+    # Only needed if the app cannot find them by itself (check Diagnostics…).
+    # WHISPER_BIN=/opt/homebrew/bin/whisper-cli
+    # WHISPER_MODEL=~/MeetingNotes/models/ggml-medium.bin
+    # WHISPER_LANGUAGE=auto        # or en, de, fr, …
+    # WHISPER_THREADS=8
+
+    # --- Summarization --------------------------------------------------------
+    # auto (default) picks the first of: Anthropic, OpenAI, Groq, a local Ollama.
+    # LLM_PROVIDER=auto            # auto | anthropic | openai | groq | ollama | none
+    # LLM_MODEL=claude-sonnet-5
+
+    # --- API keys (leave blank to stay fully offline) -------------------------
+    ANTHROPIC_API_KEY=
+    OPENAI_API_KEY=
+    GROQ_API_KEY=
+
+    # --- Fully local LLM ------------------------------------------------------
+    # OLLAMA_HOST=http://localhost:11434
+    # OLLAMA_MODEL=llama3.1:8b
+
+    # --- Audio ----------------------------------------------------------------
+    # AUDIO_FORMAT=m4a             # m4a (small) | wav (uncompressed)
+    # CAPTURE_SYSTEM_AUDIO=true
+
+    """
+}
