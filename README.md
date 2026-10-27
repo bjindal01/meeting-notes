@@ -87,6 +87,14 @@ the reliable way to make one is **Keychain Access → Certificate Assistant → 
 Certificate…**, named `Meeting Notes Local Signing`, Identity Type **Self Signed
 Root**, Certificate Type **Code Signing**, left in the **login** keychain.
 
+Remove any failed attempts first — `security delete-certificate -c NAME` refuses
+once two certificates share a name, so delete by hash:
+
+```bash
+security find-certificate -a -c "Meeting Notes Local Signing" -Z | grep "SHA-1 hash"
+security delete-certificate -Z <each-hash>
+```
+
 Prefer the GUI here. `./create-signing-identity.sh` scripts the same thing, but macOS
 will not let an imported private key be used by `codesign` until its keychain ACL is
 widened and the root is trusted — both need your login password, so the script
