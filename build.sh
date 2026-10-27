@@ -67,6 +67,9 @@ if [ "${1:-}" = "--install" ]; then
     sleep 1
     rm -rf "/Applications/${APP_NAME}.app"
     cp -R "$BUNDLE" "/Applications/${APP_NAME}.app"
+    # Leaving the staging copy around creates a second app identity with its own
+    # separate permission grants, which is a reliable way to get confused.
+    rm -rf "$BUNDLE"
     echo ""
     echo "Installed: /Applications/${APP_NAME}.app"
     echo "Open it with:  open \"/Applications/${APP_NAME}.app\""

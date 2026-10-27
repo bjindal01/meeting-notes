@@ -82,16 +82,22 @@ Every rebuild changes that hash, so every rebuild looks like a different app and
 every grant is forgotten. If you are not rebuilding, the grants stick — this only
 bites during development.
 
-**The fix: sign with a stable identity.** A self-signed certificate is enough, but it
-has to be made in the GUI (the scripted route needs trust settings that prompt for
-your password anyway):
+**The fix: sign with a stable identity.** A self-signed certificate is enough:
 
-1. Open **Keychain Access** → menu **Keychain Access › Certificate Assistant ›
-   Create a Certificate…**
-2. Name: `Meeting Notes Local Signing` · Identity Type: **Self Signed Root** ·
-   Certificate Type: **Code Signing**. Tick *Let me override defaults* only if you
-   want a longer validity. Create it, and leave it in the **login** keychain.
-3. Rebuild: `./build.sh --install`
+```bash
+./create-signing-identity.sh
+./build.sh --install
+tccutil reset ScreenCapture app.local.meetingnotes
+tccutil reset Microphone app.local.meetingnotes
+```
+
+Then grant the two permissions once more. They stick from then on, because the
+designated requirement is now the certificate rather than the binary hash.
+
+If the script's keychain import does not take, make the certificate by hand:
+**Keychain Access → Certificate Assistant → Create a Certificate…**, named
+`Meeting Notes Local Signing`, Identity Type **Self Signed Root**, Certificate Type
+**Code Signing**, left in the **login** keychain.
 
 `build.sh` finds that certificate by name automatically — or set `CODESIGN_IDENTITY`
 to use a different one. The designated requirement becomes identity-based, and your
