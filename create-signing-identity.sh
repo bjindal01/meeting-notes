@@ -15,8 +15,26 @@ KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 P12_PASS="meetingnotes-import"
 
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "$NAME"; then
-    echo "Identity \"$NAME\" already exists. Nothing to do."
+    echo "Identity \"$NAME\" already exists and is usable. Nothing to do."
     exit 0
+fi
+
+# A certificate can exist while being unusable for signing. Refuse to add another
+# one on top: re-running would otherwise leave a pile of duplicates behind.
+EXISTING=$(security find-certificate -a -c "$NAME" 2>/dev/null | grep -c '"labl"' || true)
+if [ "${EXISTING:-0}" -gt 0 ]; then
+    echo "There are ${EXISTING} certificate(s) named \"$NAME\" already in the keychain,"
+    echo "but none that codesign can use. Remove them first:"
+    echo ""
+    for _ in $(seq 1 "$EXISTING"); do
+        echo "  security delete-certificate -c \"$NAME\""
+    done
+    echo ""
+    echo "Then create one in Keychain Access, which sets the key ACL and trust"
+    echo "that an imported certificate cannot get without your login password:"
+    echo "  Keychain Access > Certificate Assistant > Create a Certificate..."
+    echo "    Name: $NAME / Self Signed Root / Code Signing"
+    exit 1
 fi
 
 TMP="$(mktemp -d)"
