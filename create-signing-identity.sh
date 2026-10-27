@@ -22,6 +22,15 @@ fi
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
+cat <<'WARN'
+Note: the scripted route often cannot finish on its own. macOS will not let an
+imported private key be used by codesign until its keychain ACL is widened
+(security set-key-partition-list) and the self-signed root is trusted, and both
+of those need your login password. If this script ends by telling you to use
+Keychain Access, that is why -- the GUI path sets both up correctly.
+
+WARN
+
 echo "==> Generating a 10-year self-signed code-signing certificate"
 openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
     -subj "/CN=$NAME" \
@@ -59,7 +68,12 @@ if security find-identity -v -p codesigning 2>/dev/null | grep -q "$NAME"; then
     echo "Remove the certificate any time with:"
     echo "  security delete-identity -c \"$NAME\""
 else
-    echo "The identity did not register. Create it by hand instead:"
+    echo "The certificate imported but is not usable for signing"
+    echo "(codesign would fail with errSecInternalComponent: the private key's"
+    echo "keychain ACL does not permit it). Remove it and use the GUI instead:"
+    echo ""
+    echo "  security delete-certificate -c \"$NAME\""
+    echo ""
     echo ""
     echo "  Keychain Access > Certificate Assistant > Create a Certificate..."
     echo "    Name:              $NAME"

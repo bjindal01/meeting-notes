@@ -82,10 +82,19 @@ Every rebuild changes that hash, so every rebuild looks like a different app and
 every grant is forgotten. If you are not rebuilding, the grants stick — this only
 bites during development.
 
-**The fix: sign with a stable identity.** A self-signed certificate is enough:
+**The fix: sign with a stable identity.** A self-signed certificate is enough, and
+the reliable way to make one is **Keychain Access → Certificate Assistant → Create a
+Certificate…**, named `Meeting Notes Local Signing`, Identity Type **Self Signed
+Root**, Certificate Type **Code Signing**, left in the **login** keychain.
+
+Prefer the GUI here. `./create-signing-identity.sh` scripts the same thing, but macOS
+will not let an imported private key be used by `codesign` until its keychain ACL is
+widened and the root is trusted — both need your login password, so the script
+usually ends by pointing you back at Keychain Access anyway.
+
+With the certificate in place:
 
 ```bash
-./create-signing-identity.sh
 ./build.sh --install
 tccutil reset ScreenCapture app.local.meetingnotes
 tccutil reset Microphone app.local.meetingnotes
