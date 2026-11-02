@@ -24,6 +24,10 @@ enum Transcriber {
     }
 
     static func transcribe(url: URL, progress: @escaping (String) -> Void) async throws -> TranscriptionResult {
+        let configured = Config.shared.string("TRANSCRIBE_BACKEND", default: "auto").lowercased()
+        guard TranscribeBackend(rawValue: configured) != nil else {
+            throw AppError.transcription("TRANSCRIBE_BACKEND=\"\(configured)\" is not recognized. Use auto, local, openai, groq or mistral. If you just added a backend to the source, install the new build.")
+        }
         switch resolveBackend() {
         case .local, .auto:
             return try await local(url: url, progress: progress)

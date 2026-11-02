@@ -111,6 +111,12 @@ enum Summarizer {
     private static let chunkCharacterLimit = 48_000
 
     static func summarize(transcript: String, progress: @escaping (String) -> Void) async throws -> SummaryResult {
+        // An unrecognized value used to fall back to .auto silently, which could
+        // send one provider's model name to a different provider.
+        let configured = Config.shared.string("LLM_PROVIDER", default: "auto").lowercased()
+        guard LLMProvider(rawValue: configured) != nil else {
+            throw AppError.summarization("LLM_PROVIDER=\"\(configured)\" is not recognized. Use auto, anthropic, openai, groq, mistral, ollama or none. If you just added a provider to the source, install the new build.")
+        }
         let provider = resolveProvider()
         guard provider != .none else {
             throw AppError.summarization("No LLM configured. Add ANTHROPIC_API_KEY, OPENAI_API_KEY or GROQ_API_KEY to \(Config.shared.envFileURL.path), or run Ollama locally.")
