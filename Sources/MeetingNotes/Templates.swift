@@ -12,7 +12,7 @@ enum Templates {
 
     # --- Transcription --------------------------------------------------------
     # auto (default) = local whisper.cpp when it is installed, otherwise an API key below.
-    # TRANSCRIBE_BACKEND=auto      # auto | local | openai | groq
+    # TRANSCRIBE_BACKEND=auto      # auto | local | openai | groq | mistral
 
     # Only needed if the app cannot find them by itself (check Diagnostics…).
     # WHISPER_BIN=/opt/homebrew/bin/whisper-cli
@@ -29,6 +29,10 @@ enum Templates {
     ANTHROPIC_API_KEY=
     OPENAI_API_KEY=
     GROQ_API_KEY=
+
+    # Mistral Voxtral speech-to-text.
+    MISTRAL_API_KEY=
+    # MISTRAL_TRANSCRIBE_MODEL=voxtral-mini-transcribe-3   # or voxtral-small-transcribe-3
 
     # --- Fully local LLM ------------------------------------------------------
     # OLLAMA_HOST=http://localhost:11434

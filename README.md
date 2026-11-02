@@ -165,18 +165,25 @@ cd ~/whisper.cpp && cmake -B build && cmake --build build -j --config Release
 
 The app checks Homebrew paths, `~/whisper.cpp/build/bin/`, and your `PATH`.
 
-### Option B — hosted Whisper
+### Option B — hosted speech-to-text
 
 Skip `install-deps.sh` and put a key in `~/MeetingNotes/.env`:
 
 ```
-OPENAI_API_KEY=sk-...
+GROQ_API_KEY=gsk_...        # whisper-large-v3, very fast
 # or
-GROQ_API_KEY=gsk_...
+MISTRAL_API_KEY=...         # Voxtral, from console.mistral.ai
+# or
+OPENAI_API_KEY=sk-...       # whisper-1
 ```
 
-Recordings longer than ten minutes are split automatically, since both APIs cap
-uploads at 25 MB.
+Then pin the one you want with `TRANSCRIBE_BACKEND`, since `auto` prefers a local
+whisper.cpp when it finds one.
+
+Long recordings are split automatically. OpenAI and Groq cap uploads at 25 MB, so
+those split every ten minutes. Mistral documents no size cap — its limit is a 65,536
+token context, and audio costs roughly 22 tokens per second, so those split every
+25 minutes.
 
 ### Summaries
 
@@ -257,11 +264,12 @@ Everything is optional; the defaults work. Edit via the **Edit .env…** menu it
 | Key | Default | Meaning |
 |---|---|---|
 | `NOTES_DIR` | `~/MeetingNotes` | Where notes and audio go |
-| `TRANSCRIBE_BACKEND` | `auto` | `auto` \| `local` \| `openai` \| `groq` |
+| `TRANSCRIBE_BACKEND` | `auto` | `auto` \| `local` \| `openai` \| `groq` \| `mistral` |
 | `WHISPER_BIN` | auto-detected | Path to `whisper-cli` |
 | `WHISPER_MODEL` | auto-detected | Path to a `ggml-*.bin` |
 | `WHISPER_LANGUAGE` | `auto` | Or `en`, `de`, `fr`, … |
 | `WHISPER_THREADS` | cores − 2 | Local transcription threads |
+| `MISTRAL_TRANSCRIBE_MODEL` | `voxtral-mini-transcribe-3` | Or `voxtral-small-transcribe-3` |
 | `LLM_PROVIDER` | `auto` | `anthropic` \| `openai` \| `groq` \| `ollama` \| `none` |
 | `LLM_MODEL` | per provider | Overrides the default model. Providers retire names — if a summary fails with a 404, the error lists what your account can actually use. |
 | `OLLAMA_HOST` | `http://localhost:11434` | Local LLM endpoint |
@@ -269,7 +277,7 @@ Everything is optional; the defaults work. Edit via the **Edit .env…** menu it
 | `CAPTURE_SYSTEM_AUDIO` | `true` | Start with system audio on |
 
 `auto` means: transcribe locally if whisper.cpp and a model are present, otherwise
-use a key; summarize with Anthropic, then OpenAI, then Groq, then a local Ollama.
+the first key present in the order Groq, Mistral, OpenAI; summarize with Anthropic, then OpenAI, then Groq, then a local Ollama.
 
 ---
 

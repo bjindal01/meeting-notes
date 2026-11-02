@@ -7,7 +7,7 @@ struct TranscriptionResult {
 }
 
 enum TranscribeBackend: String {
-    case auto, local, openai, groq
+    case auto, local, openai, groq, mistral
 }
 
 /// Turns the recorded WAV into text, preferring the fully offline path.
@@ -18,6 +18,7 @@ enum Transcriber {
         guard configured == .auto else { return configured }
         if Config.shared.canTranscribeLocally { return .local }
         if Config.shared.string("GROQ_API_KEY") != nil { return .groq }
+        if Config.shared.string("MISTRAL_API_KEY") != nil { return .mistral }
         if Config.shared.string("OPENAI_API_KEY") != nil { return .openai }
         return .local   // will fail with a useful message about installing whisper.cpp
     }
@@ -30,6 +31,8 @@ enum Transcriber {
             return try await api(url: url, provider: .openai, progress: progress)
         case .groq:
             return try await api(url: url, provider: .groq, progress: progress)
+        case .mistral:
+            return try await api(url: url, provider: .mistral, progress: progress)
         }
     }
 
@@ -70,20 +73,65 @@ enum Transcriber {
     // MARK: - Hosted Whisper
 
     enum APIProvider {
-        case openai, groq
+        case openai, groq, mistral
 
         var endpoint: URL {
             switch self {
             case .openai: return URL(string: "https://api.openai.com/v1/audio/transcriptions")!
             case .groq: return URL(string: "https://api.groq.com/openai/v1/audio/transcriptions")!
+            case .mistral: return URL(string: "https://api.mistral.ai/v1/audio/transcriptions")!
             }
         }
-        var keyName: String { self == .openai ? "OPENAI_API_KEY" : "GROQ_API_KEY" }
-        var label: String { self == .openai ? "OpenAI" : "Groq" }
+
+        var keyName: String {
+            switch self {
+            case .openai: return "OPENAI_API_KEY"
+            case .groq: return "GROQ_API_KEY"
+            case .mistral: return "MISTRAL_API_KEY"
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .openai: return "OpenAI"
+            case .groq: return "Groq"
+            case .mistral: return "Mistral"
+            }
+        }
+
         var model: String {
-            self == .openai
-                ? Config.shared.string("OPENAI_TRANSCRIBE_MODEL", default: "whisper-1")
-                : Config.shared.string("GROQ_TRANSCRIBE_MODEL", default: "whisper-large-v3")
+            switch self {
+            case .openai: return Config.shared.string("OPENAI_TRANSCRIBE_MODEL", default: "whisper-1")
+            case .groq: return Config.shared.string("GROQ_TRANSCRIBE_MODEL", default: "whisper-large-v3")
+            // voxtral-small-transcribe-3 is the larger, more accurate sibling.
+            case .mistral: return Config.shared.string("MISTRAL_TRANSCRIBE_MODEL", default: "voxtral-mini-transcribe-3")
+            }
+        }
+
+        /// OpenAI and Groq cap uploads at 25 MB, which 10 minutes of 16 kHz mono
+        /// stays under. Mistral documents no size cap; its real limit is a 65,536
+        /// token context, and audio costs roughly 22 tokens per second — about 49
+        /// minutes. 25 minutes leaves generous headroom.
+        var chunkSeconds: Int { self == .mistral ? 1500 : 600 }
+
+        /// Mistral returns JSON; the others accept response_format=text and return
+        /// the transcript as the raw body.
+        var returnsJSON: Bool { self == .mistral }
+
+        var modelKeyName: String {
+            switch self {
+            case .openai: return "OPENAI_TRANSCRIBE_MODEL"
+            case .groq: return "GROQ_TRANSCRIBE_MODEL"
+            case .mistral: return "MISTRAL_TRANSCRIBE_MODEL"
+            }
+        }
+
+        var modelsEndpoint: URL? {
+            switch self {
+            case .openai: return URL(string: "https://api.openai.com/v1/models")
+            case .groq: return URL(string: "https://api.groq.com/openai/v1/models")
+            case .mistral: return URL(string: "https://api.mistral.ai/v1/models")
+            }
         }
     }
 
@@ -91,10 +139,9 @@ enum Transcriber {
         guard let key = Config.shared.string(provider.keyName) else {
             throw AppError.transcription("\(provider.keyName) is not set in \(Config.shared.envFileURL.path)")
         }
-        // Both APIs cap uploads at 25 MB; 10 minutes of 16 kHz mono is ~19 MB.
         let scratch = FileManager.default.temporaryDirectory
             .appendingPathComponent("meetingnotes-chunks-\(UUID().uuidString)")
-        let chunks = try WavReader.split(url, seconds: 600, into: scratch)
+        let chunks = try WavReader.split(url, seconds: provider.chunkSeconds, into: scratch)
         defer { try? FileManager.default.removeItem(at: scratch) }
 
         var pieces: [String] = []
@@ -129,7 +176,8 @@ enum Transcriber {
             body.append("\(value)\r\n".data(using: .utf8)!)
         }
         field("model", provider.model)
-        field("response_format", "text")
+        // Mistral's endpoint does not document response_format and answers in JSON.
+        if !provider.returnsJSON { field("response_format", "text") }
         if let language = Config.shared.string("WHISPER_LANGUAGE"), language != "auto" {
             field("language", language)
         }
@@ -144,11 +192,45 @@ enum Transcriber {
         guard let http = response as? HTTPURLResponse else {
             throw AppError.transcription("no response from \(provider.label)")
         }
-        let text = String(data: data, encoding: .utf8) ?? ""
+        let responseBody = String(data: data, encoding: .utf8) ?? ""
         guard (200..<300).contains(http.statusCode) else {
-            throw AppError.transcription("\(provider.label) returned HTTP \(http.statusCode): \(text.prefix(400))")
+            // A wrong model name is the most likely cause, and providers rename
+            // them, so say which ones this account can actually use.
+            if [400, 404, 422].contains(http.statusCode), responseBody.contains("model") {
+                let available = transcriptionModels(for: provider)
+                if !available.isEmpty {
+                    throw AppError.transcription("\(provider.label) rejected model \"\(provider.model)\". Set \(provider.modelKeyName) in .env to one of: \(available.joined(separator: ", "))")
+                }
+            }
+            throw AppError.transcription("\(provider.label) returned HTTP \(http.statusCode): \(responseBody.prefix(400))")
+        }
+        guard provider.returnsJSON else { return responseBody }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let text = json["text"] as? String else {
+            throw AppError.transcription("could not read the transcript from the \(provider.label) response: \(responseBody.prefix(300))")
         }
         return text
+    }
+
+    /// Best-effort model listing, so a renamed model produces an actionable error.
+    private static func transcriptionModels(for provider: APIProvider) -> [String] {
+        guard let url = provider.modelsEndpoint, let key = Config.shared.string(provider.keyName) else { return [] }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 10
+        request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+        let semaphore = DispatchSemaphore(value: 0)
+        var names: [String] = []
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            defer { semaphore.signal() }
+            guard let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let models = json["data"] as? [[String: Any]] else { return }
+            names = models.compactMap { $0["id"] as? String }
+                .filter { $0.contains("transcribe") || $0.contains("whisper") || $0.contains("voxtral") }
+                .sorted()
+        }.resume()
+        _ = semaphore.wait(timeout: .now() + 12)
+        return names
     }
 
     // MARK: - Helpers
