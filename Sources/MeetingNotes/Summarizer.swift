@@ -6,7 +6,7 @@ struct SummaryResult {
 }
 
 enum LLMProvider: String {
-    case auto, anthropic, openai, groq, ollama, none
+    case auto, anthropic, openai, groq, mistral, ollama, none
 }
 
 /// Sends the transcript to an LLM and gets back the three sections that go at
@@ -47,6 +47,7 @@ enum Summarizer {
         if Config.shared.string("ANTHROPIC_API_KEY") != nil { return .anthropic }
         if Config.shared.string("OPENAI_API_KEY") != nil { return .openai }
         if Config.shared.string("GROQ_API_KEY") != nil { return .groq }
+        if Config.shared.string("MISTRAL_API_KEY") != nil { return .mistral }
         if ollamaReachable() { return .ollama }
         return .none
     }
@@ -92,6 +93,7 @@ enum Summarizer {
         case .anthropic: return "claude-sonnet-5"
         case .openai: return "gpt-4o"
         case .groq: return "openai/gpt-oss-120b"
+        case .mistral: return "mistral-large-latest"
         case .ollama:
             if let configured = Config.shared.string("OLLAMA_MODEL") { return configured }
             let installed = ollamaModels()
@@ -182,6 +184,10 @@ enum Summarizer {
         case .groq: return try await callOpenAICompatible(
             endpoint: URL(string: "https://api.groq.com/openai/v1/chat/completions")!,
             keyName: "GROQ_API_KEY", label: "Groq", model: model, system: system, user: user)
+        // Mistral's chat endpoint takes the same request and response shape.
+        case .mistral: return try await callOpenAICompatible(
+            endpoint: URL(string: "https://api.mistral.ai/v1/chat/completions")!,
+            keyName: "MISTRAL_API_KEY", label: "Mistral", model: model, system: system, user: user)
         case .ollama: return try await callOllama(model: model, system: system, user: user)
         case .auto, .none: throw AppError.summarization("no provider resolved")
         }
@@ -269,9 +275,12 @@ enum Summarizer {
 
     /// Best-effort lookup so a retired model name produces an actionable error.
     private static func availableModels(for label: String) -> [String] {
-        let (endpoint, keyName): (String, String) = label == "Groq"
-            ? ("https://api.groq.com/openai/v1/models", "GROQ_API_KEY")
-            : ("https://api.openai.com/v1/models", "OPENAI_API_KEY")
+        let (endpoint, keyName): (String, String)
+        switch label {
+        case "Groq": (endpoint, keyName) = ("https://api.groq.com/openai/v1/models", "GROQ_API_KEY")
+        case "Mistral": (endpoint, keyName) = ("https://api.mistral.ai/v1/models", "MISTRAL_API_KEY")
+        default: (endpoint, keyName) = ("https://api.openai.com/v1/models", "OPENAI_API_KEY")
+        }
         guard let url = URL(string: endpoint), let key = Config.shared.string(keyName) else { return [] }
         var request = URLRequest(url: url)
         request.timeoutInterval = 10

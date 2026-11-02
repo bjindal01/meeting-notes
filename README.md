@@ -195,6 +195,16 @@ OPENAI_API_KEY=sk-...
 GROQ_API_KEY=gsk_...
 ```
 
+One Mistral key covers both stages — Voxtral for transcription and a chat model for
+the summary:
+
+```
+MISTRAL_API_KEY=...
+TRANSCRIBE_BACKEND=mistral
+LLM_PROVIDER=mistral
+LLM_MODEL=mistral-large-latest
+```
+
 Or run [Ollama](https://ollama.com) for summaries that never leave the machine:
 
 ```bash
@@ -270,14 +280,14 @@ Everything is optional; the defaults work. Edit via the **Edit .env…** menu it
 | `WHISPER_LANGUAGE` | `auto` | Or `en`, `de`, `fr`, … |
 | `WHISPER_THREADS` | cores − 2 | Local transcription threads |
 | `MISTRAL_TRANSCRIBE_MODEL` | `voxtral-mini-transcribe-3` | Or `voxtral-small-transcribe-3` |
-| `LLM_PROVIDER` | `auto` | `anthropic` \| `openai` \| `groq` \| `ollama` \| `none` |
+| `LLM_PROVIDER` | `auto` | `anthropic` \| `openai` \| `groq` \| `mistral` \| `ollama` \| `none` |
 | `LLM_MODEL` | per provider | Overrides the default model. Providers retire names — if a summary fails with a 404, the error lists what your account can actually use. |
 | `OLLAMA_HOST` | `http://localhost:11434` | Local LLM endpoint |
 | `AUDIO_FORMAT` | `m4a` | `m4a` or `wav` |
 | `CAPTURE_SYSTEM_AUDIO` | `true` | Start with system audio on |
 
 `auto` means: transcribe locally if whisper.cpp and a model are present, otherwise
-the first key present in the order Groq, Mistral, OpenAI; summarize with Anthropic, then OpenAI, then Groq, then a local Ollama.
+the first key present in the order Groq, Mistral, OpenAI; summarize with Anthropic, then OpenAI, then Groq, then Mistral, then a local Ollama.
 
 ---
 

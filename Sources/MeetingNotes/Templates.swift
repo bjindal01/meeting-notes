@@ -22,7 +22,7 @@ enum Templates {
 
     # --- Summarization --------------------------------------------------------
     # auto (default) picks the first of: Anthropic, OpenAI, Groq, a local Ollama.
-    # LLM_PROVIDER=auto            # auto | anthropic | openai | groq | ollama | none
+    # LLM_PROVIDER=auto            # auto | anthropic | openai | groq | mistral | ollama | none
     # LLM_MODEL=claude-sonnet-5
 
     # --- API keys (leave blank to stay fully offline) -------------------------
@@ -30,7 +30,7 @@ enum Templates {
     OPENAI_API_KEY=
     GROQ_API_KEY=
 
-    # Mistral Voxtral speech-to-text.
+    # Mistral: Voxtral for speech-to-text, and chat models for summaries.
     MISTRAL_API_KEY=
     # MISTRAL_TRANSCRIBE_MODEL=voxtral-mini-transcribe-3   # or voxtral-small-transcribe-3
 
